@@ -190,6 +190,29 @@
     background: #fff;
   }
 
+  .event-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    background: var(--soft-bg);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    user-select: none;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .event-toggle:hover { border-color: var(--cyan); }
+  .event-toggle input { cursor: pointer; width: 16px; height: 16px; accent-color: var(--cyan); }
+  .event-toggle.active {
+    background: linear-gradient(135deg, #e0f7ff, #fff);
+    border-color: var(--cyan);
+    color: var(--cyan);
+  }
+
   button {
     cursor: pointer;
     font-family: inherit;
@@ -415,6 +438,10 @@
 
   <div class="toolbar">
     <input class="search-input" id="searchInput" type="text" placeholder="🔍 Search by name, email, country, specialization…" />
+    <label class="event-toggle active" id="sedoToggleLabel" title="When ON, dashboard shows only entries submitted from May 15, 2026 onwards (SEDO Palma). Turn OFF to also see Kazakhstan-almaty data.">
+      <input type="checkbox" id="sedoToggle" checked />
+      <span>🇪🇸 SEDO Palma only</span>
+    </label>
     <button class="btn btn-primary" id="exportBtn">📥 Export to Excel</button>
     <button class="btn btn-fr" id="drawBtn">🎲 Draw a winner</button>
     <button class="btn btn-ghost" id="refreshBtn">↻ Refresh</button>
@@ -492,7 +519,31 @@
   const winnerEmailEl = document.getElementById('winnerEmail');
   const winnerSpecEl = document.getElementById('winnerSpec');
 
-  let entries = []; // cache
+  let entries = []; // cache (raw, all entries from DB)
+
+  // SEDO Palma filter: when true, restrict to entries dated >= 2026-05-15
+  // (after the Kazakhstan-almaty event ended).
+  const SEDO_CUTOFF = '2026-05-15T00:00:00.000Z';
+  let sedoOnlyMode = true;
+  function getActive() {
+    if (!sedoOnlyMode) return entries;
+    return entries.filter(r => r.created_at && r.created_at >= SEDO_CUTOFF);
+  }
+  function refreshView() {
+    const active = getActive();
+    renderTable(active);
+    renderStats(active);
+    // also re-apply current search filter on top
+    const q = (searchInput.value || '').trim().toLowerCase();
+    if (q) {
+      const filtered = active.filter(r => (
+        [r.full_name, r.email, r.specialization, r.clinic_name, r.country, r.phone, fmtNum(r.entry_number)]
+          .filter(Boolean)
+          .some(s => String(s).toLowerCase().includes(q))
+      ));
+      renderTable(filtered);
+    }
+  }
 
   function fmtNum(n) { return 'BL-' + String(n).padStart(3, '0'); }
   function fmtDate(iso) {
@@ -564,8 +615,7 @@
       return;
     }
     entries = data || [];
-    renderTable(entries);
-    renderStats(entries);
+    refreshView();
   }
 
   function renderStats(rows) {
@@ -601,8 +651,9 @@
   // ========== SEARCH ==========
   searchInput.addEventListener('input', () => {
     const q = searchInput.value.trim().toLowerCase();
-    if (!q) { renderTable(entries); return; }
-    const filtered = entries.filter(r => (
+    const active = getActive();
+    if (!q) { renderTable(active); return; }
+    const filtered = active.filter(r => (
       [r.full_name, r.email, r.specialization, r.clinic_name, r.country, r.phone, fmtNum(r.entry_number)]
         .filter(Boolean)
         .some(s => String(s).toLowerCase().includes(q))
@@ -610,12 +661,22 @@
     renderTable(filtered);
   });
 
+  // ========== SEDO ONLY TOGGLE ==========
+  const sedoToggle = document.getElementById('sedoToggle');
+  const sedoToggleLabel = document.getElementById('sedoToggleLabel');
+  sedoToggle.addEventListener('change', () => {
+    sedoOnlyMode = sedoToggle.checked;
+    sedoToggleLabel.classList.toggle('active', sedoOnlyMode);
+    refreshView();
+  });
+
   refreshBtn.addEventListener('click', loadEntries);
 
   // ========== EXPORT TO EXCEL ==========
   exportBtn.addEventListener('click', () => {
-    if (entries.length === 0) { alert('No entries to export yet.'); return; }
-    const rows = entries.map(r => ({
+    const exportSet = getActive();
+    if (exportSet.length === 0) { alert('No entries to export yet.'); return; }
+    const rows = exportSet.map(r => ({
       'Raffle #':       fmtNum(r.entry_number),
       'Full Name':      r.full_name || '',
       'Email':          r.email || '',
@@ -634,7 +695,8 @@
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Raffle Entries');
     const stamp = new Date().toISOString().slice(0,10);
-    XLSX.writeFile(wb, `Bloom-Raffle-SEDO-Palma-${stamp}.xlsx`);
+    const tag = sedoOnlyMode ? 'SEDO-Palma' : 'ALL';
+    XLSX.writeFile(wb, `Bloom-Raffle-${tag}-${stamp}.xlsx`);
   });
 
   // ========== DRAW WINNER ==========
@@ -649,11 +711,17 @@
   }
 
   drawBtn.addEventListener('click', () => {
-    if (entries.length === 0) { alert('No entries yet.'); return; }
-    if (!confirm(`Draw a random winner from ${entries.length} entries?`)) return;
-    showWinner(pickRandom(entries));
+    const pool = getActive();
+    if (pool.length === 0) { alert('No entries yet.'); return; }
+    const label = sedoOnlyMode ? 'SEDO Palma entries' : 'entries (ALL events)';
+    if (!confirm(`Draw a random winner from ${pool.length} ${label}?`)) return;
+    showWinner(pickRandom(pool));
   });
-  reDrawBtn.addEventListener('click', () => showWinner(pickRandom(entries)));
+  reDrawBtn.addEventListener('click', () => {
+    const pool = getActive();
+    if (pool.length === 0) return;
+    showWinner(pickRandom(pool));
+  });
   closeModalBtn.addEventListener('click', () => winnerModal.classList.remove('show'));
   winnerModal.addEventListener('click', (e) => {
     if (e.target === winnerModal) winnerModal.classList.remove('show');
