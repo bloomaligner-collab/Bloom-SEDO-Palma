@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Bloom Raffle · Admin · SEDO Palma 2026</title>
+<title>Bloom Raffle · Admin · Marrakech 2026</title>
 <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%231BACDB'/></svg>" />
 <style>
   :root {
@@ -438,9 +438,9 @@
 
   <div class="toolbar">
     <input class="search-input" id="searchInput" type="text" placeholder="🔍 Search by name, email, country, specialization…" />
-    <label class="event-toggle active" id="sedoToggleLabel" title="When ON, dashboard shows only entries submitted from May 15, 2026 onwards (SEDO Palma). Turn OFF to also see Kazakhstan-almaty data.">
+    <label class="event-toggle active" id="sedoToggleLabel" title="When ON, dashboard shows only entries submitted from June 12, 2026 onwards (Marrakech 13.06.2026). Turn OFF to also see SEDO Palma & Kazakhstan-almaty data.">
       <input type="checkbox" id="sedoToggle" checked />
-      <span>🇪🇸 SEDO Palma only</span>
+      <span>🇲🇦 Marrakech only</span>
     </label>
     <button class="btn btn-primary" id="exportBtn">📥 Export to Excel</button>
     <button class="btn btn-fr" id="drawBtn">🎲 Draw a winner</button>
@@ -521,9 +521,9 @@
 
   let entries = []; // cache (raw, all entries from DB)
 
-  // SEDO Palma filter: when true, restrict to entries dated >= 2026-05-15
-  // (after the Kazakhstan-almaty event ended).
-  const SEDO_CUTOFF = '2026-05-15T00:00:00.000Z';
+  // Marrakech filter: when true, restrict to entries dated >= 2026-06-12
+  // (after the SEDO Palma congress ended — Marrakech event is 13.06.2026).
+  const SEDO_CUTOFF = '2026-06-12T00:00:00.000Z';
   let sedoOnlyMode = true;
   function getActive() {
     if (!sedoOnlyMode) return entries;
@@ -695,7 +695,7 @@
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Raffle Entries');
     const stamp = new Date().toISOString().slice(0,10);
-    const tag = sedoOnlyMode ? 'SEDO-Palma' : 'ALL';
+    const tag = sedoOnlyMode ? 'Marrakech' : 'ALL';
     XLSX.writeFile(wb, `Bloom-Raffle-${tag}-${stamp}.xlsx`);
   });
 
@@ -713,7 +713,7 @@
   drawBtn.addEventListener('click', () => {
     const pool = getActive();
     if (pool.length === 0) { alert('No entries yet.'); return; }
-    const label = sedoOnlyMode ? 'SEDO Palma entries' : 'entries (ALL events)';
+    const label = sedoOnlyMode ? 'Marrakech entries' : 'entries (ALL events)';
     if (!confirm(`Draw a random winner from ${pool.length} ${label}?`)) return;
     showWinner(pickRandom(pool));
   });
